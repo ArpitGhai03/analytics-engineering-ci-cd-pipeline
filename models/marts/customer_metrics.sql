@@ -42,6 +42,12 @@ SELECT
         THEN ROUND(total_revenue / (last_order_date - first_order_date)::NUMERIC, 2)
         ELSE total_revenue
     END AS customer_lifetime_value,
+    -- Customer Segmentation: Categorize by revenue
+    CASE 
+        WHEN total_revenue >= 500 THEN 'High-Value'
+        WHEN total_revenue >= 200 THEN 'Medium-Value'
+        ELSE 'Low-Value'
+    END AS customer_segment,
     CURRENT_TIMESTAMP AS updated_at
 FROM customer_metrics
 ORDER BY total_revenue DESC
