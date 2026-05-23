@@ -36,6 +36,12 @@ SELECT
     last_order_date,
     first_order_date,
     (last_order_date - first_order_date) AS days_as_customer,
+    -- Customer Lifetime Value: Total revenue / Days as customer (daily rate)
+    CASE 
+        WHEN (last_order_date - first_order_date) > 0 
+        THEN ROUND(total_revenue / (last_order_date - first_order_date)::NUMERIC, 2)
+        ELSE total_revenue
+    END AS customer_lifetime_value,
     CURRENT_TIMESTAMP AS updated_at
 FROM customer_metrics
 ORDER BY total_revenue DESC

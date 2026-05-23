@@ -12,8 +12,13 @@ on:
       - '.github/workflows/**'
 
 env:
-  DBT_VERSION: 1.10.8
+  DBT_VERSION: 1.10.0
   PYTHON_VERSION: "3.11"
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: write
 
 jobs:
   dbt-test:
@@ -43,7 +48,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -113,6 +117,9 @@ jobs:
           (105, 5, '2026-01-19', 450.75, 'completed');
           EOF
 
+      - name: dbt Dependencies
+        run: dbt deps
+
       - name: dbt Parse (Syntax Check)
         run: dbt parse
 
@@ -130,7 +137,7 @@ jobs:
 
       - name: 📊 Upload dbt artifacts
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dbt-artifacts
           path: target/
