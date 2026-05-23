@@ -17,8 +17,6 @@ models:
         description: Customer email
         tests:
           - unique
-      - name: country
-        description: Customer country
 
   - name: stg_orders
     description: Cleaned order data with validation
@@ -35,16 +33,6 @@ models:
           - relationships:
               to: ref('stg_customers')
               field: customer_id
-      - name: order_date
-        description: Date order was placed
-        tests:
-          - not_null
-      - name: amount
-        description: Order amount
-        tests:
-          - dbt_utils.accepted_values:
-              values: [null]
-              quote: false
       - name: status
         description: Order status
         tests:

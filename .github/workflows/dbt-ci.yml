@@ -112,6 +112,9 @@ jobs:
           (105, 5, '2026-01-19', 450.75, 'completed');
           EOF
 
+      - name: dbt Dependencies
+        run: dbt deps
+
       - name: dbt Parse (Syntax Check)
         run: dbt parse
 
