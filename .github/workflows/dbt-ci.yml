@@ -1,0 +1,250 @@
+name: dbt CI/CD Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'models/**'
+      - 'dbt_project.yml'
+      - 'ingestion/**'
+      - '.github/workflows/**'
+
+env:
+  DBT_VERSION: 1.10.8
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  dbt-test:
+    name: dbt Validation & Testing
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dbt_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install dbt-postgres==${{ env.DBT_VERSION }} pandas psycopg2-binary
+
+      - name: Create .dbt directory
+        run: mkdir -p ~/.dbt
+
+      - name: Create profiles.yml for CI
+        run: |
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          dbt_project:
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: postgres
+                password: postgres
+                dbname: dbt_test
+                schema: public
+                threads: 4
+                keepalives_idle: 0
+            target: ci
+          EOF
+
+      - name: Wait for PostgreSQL
+        run: |
+          until PGPASSWORD=postgres psql -h localhost -U postgres -d dbt_test -c "SELECT 1" 2>/dev/null; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Create seed data
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d dbt_test << 'EOF'
+          CREATE TABLE IF NOT EXISTS customers (
+              customer_id INTEGER PRIMARY KEY,
+              customer_name VARCHAR(255),
+              email VARCHAR(255),
+              phone VARCHAR(20),
+              country VARCHAR(100)
+          );
+
+          CREATE TABLE IF NOT EXISTS orders (
+              order_id INTEGER PRIMARY KEY,
+              customer_id INTEGER,
+              order_date DATE,
+              amount DECIMAL(10, 2),
+              status VARCHAR(50),
+              FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+          );
+
+          INSERT INTO customers VALUES
+          (1, 'Alice Johnson', 'alice@test.com', '555-1001', 'USA'),
+          (2, 'Bob Smith', 'bob@test.com', '555-1002', 'Canada'),
+          (3, 'Carol Davis', 'carol@test.com', '555-1003', 'USA'),
+          (4, 'David Wilson', 'david@test.com', '555-1004', 'UK'),
+          (5, 'Emma Brown', 'emma@test.com', '555-1005', 'Australia');
+
+          INSERT INTO orders VALUES
+          (101, 1, '2026-01-15', 250.50, 'completed'),
+          (102, 2, '2026-01-16', 175.25, 'completed'),
+          (103, 3, '2026-01-17', 320.00, 'completed'),
+          (104, 1, '2026-01-18', 89.99, 'pending'),
+          (105, 5, '2026-01-19', 450.75, 'completed');
+          EOF
+
+      - name: dbt Parse (Syntax Check)
+        run: dbt parse
+
+      - name: dbt Debug
+        run: dbt debug
+
+      - name: dbt Run (Execute Models)
+        run: dbt run
+
+      - name: dbt Test (Data Quality Checks)
+        run: dbt test
+
+      - name: Generate dbt Docs
+        run: dbt docs generate
+
+      - name: 📊 Upload dbt artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: dbt-artifacts
+          path: target/
+
+      - name: ✅ Pipeline Status Check
+        if: success()
+        run: echo "✅ All dbt checks passed! Ready for approval."
+
+      - name: ❌ Pipeline Failed
+        if: failure()
+        run: |
+          echo "❌ dbt validation failed!"
+          exit 1
+
+  approval:
+    name: 🔔 Manual Approval Gate
+    needs: dbt-test
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - name: Request Approval
+        run: |
+          echo "✅ All automated tests passed!"
+          echo "🔔 Awaiting manual approval..."
+          echo ""
+          echo "Review the PR and approve to merge."
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create approval comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **All dbt checks passed!**\n\n🔔 **Awaiting approval for merge**\n\nPlease review and approve this PR to proceed with deployment.'
+            })
+
+  auto-merge:
+    name: 🚀 Auto-Merge after Approval
+    needs: [dbt-test, approval]
+    runs-on: ubuntu-latest
+    if: success()
+    
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for PR approval
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.issue.number;
+            let approved = false;
+            let attempts = 0;
+            const maxAttempts = 120; // 10 minutes with 5-second intervals
+
+            while (!approved && attempts < maxAttempts) {
+              const reviews = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr
+              });
+
+              const approvals = reviews.data.filter(review => review.state === 'APPROVED');
+              if (approvals.length > 0) {
+                approved = true;
+                console.log('✅ PR approved! Proceeding with merge...');
+              } else {
+                console.log(`Waiting for approval... (${attempts + 1}/${maxAttempts})`);
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+                attempts++;
+              }
+            }
+
+            if (!approved) {
+              throw new Error('❌ PR approval timeout or no approval found');
+            }
+
+      - name: Enable auto-merge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              const response = await github.rest.pulls.enableAutoMerge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash'
+              });
+              console.log('✅ Auto-merge enabled! PR will be merged automatically.');
+            } catch (error) {
+              // If enableAutoMerge not available, manually merge
+              console.log('Auto-merge not available, performing manual merge...');
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash',
+                commit_title: `Merge dbt changes (PR #${context.issue.number})`
+              });
+              console.log('✅ PR merged successfully!');
+            }
+
+      - name: 🎉 Deployment Success
+        run: echo "🎉 PR approved and merged to main!"

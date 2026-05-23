@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: customer_metrics
+    description: Customer KPI metrics table with business intelligence
+    columns:
+      - name: customer_id
+        description: Unique customer identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Customer name
+      - name: email
+        description: Customer email
+      - name: country
+        description: Customer country
+      - name: total_orders
+        description: Total number of orders
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_of_type:
+              column_type: bigint
+      - name: completed_orders
+        description: Number of completed orders
+        tests:
+          - not_null
+      - name: pending_orders
+        description: Number of pending orders
+      - name: total_revenue
+        description: Total revenue from completed orders
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: avg_order_value
+        description: Average order value
+      - name: last_order_date
+        description: Most recent order date
+      - name: first_order_date
+        description: Oldest order date
