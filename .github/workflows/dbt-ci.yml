@@ -12,7 +12,7 @@ on:
       - '.github/workflows/**'
 
 env:
-  DBT_VERSION: 1.10.8
+  DBT_VERSION: 1.10.0
   PYTHON_VERSION: "3.11"
 
 jobs:
