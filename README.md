@@ -146,6 +146,65 @@ python ingestion/export_final_data.py
 
 ---
 
+## CI/CD Pipeline (GitHub Actions)
+
+This project includes an automated CI/CD pipeline using GitHub Actions that validates all changes before merging to production.
+
+### How It Works
+
+#### 1. **Trigger** 🚀
+- Automatically activates when you create a Pull Request (PR) to `main` or `staging` branch
+- Only runs if changes are in: `models/`, `dbt_project.yml`, `ingestion/`, or workflow files
+
+#### 2. **Automated Tests** ✅
+The pipeline runs the following checks automatically (~3-5 minutes):
+- **`dbt parse`** - Validates dbt syntax
+- **`dbt debug`** - Checks database connection
+- **`dbt run`** - Executes all models (staging + marts)
+- **`dbt test`** - Runs data quality tests:
+  - `customer_id`: must be unique and not null
+  - `email`: must be unique
+  - `order_id`: must be unique and not null
+  - `status`: only allowed values (completed, pending, cancelled)
+  - `total_revenue`: must be ≥ 0
+
+**If tests fail:** ❌ PR is blocked with error details in comments
+
+#### 3. **Approval & Auto-Merge** 🚀
+- Once all tests pass ✅, the PR requires your manual approval
+- You review the changes on GitHub and approve
+- Auto-merge happens automatically using squash merge (clean commit history)
+
+### Creating a Change
+
+```bash
+# Create feature branch
+git checkout -b feature/new-model
+
+# Make changes to models or ingestion scripts
+git add models/ ingestion/
+git commit -m "Add new model or feature"
+git push -u origin feature/new-model
+
+# Create Pull Request on GitHub
+# GitHub Actions runs tests automatically
+# Review results and approve
+# Auto-merge to main happens automatically
+```
+
+### View Workflow Runs
+1. Go to: https://github.com/ArpitGhai03/analytics-engineering-ci-cd-pipeline/actions
+2. View test results, logs, and approval status
+
+### Setup Details
+See [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md) for:
+- Initial GitHub setup instructions
+- Detailed workflow configuration
+- Environment variables and secrets
+- Troubleshooting guide
+
+---
+
 ## Database Objects Created
 
 ### Tables
