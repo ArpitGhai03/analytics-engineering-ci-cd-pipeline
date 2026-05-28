@@ -48,6 +48,29 @@ SELECT
         WHEN total_revenue >= 200 THEN 'Medium-Value'
         ELSE 'Low-Value'
     END AS customer_segment,
+    -- Repeat Customer Flag: True if customer has more than 1 order
+    CASE 
+        WHEN total_orders > 1 THEN TRUE
+        ELSE FALSE
+    END AS is_repeat_customer,
+    -- Order Recency: Days since last order
+    CASE 
+        WHEN last_order_date IS NOT NULL 
+        THEN (CURRENT_DATE - last_order_date)
+        ELSE NULL
+    END AS days_since_last_order,
+    -- Completion Rate: Percentage of orders completed
+    CASE 
+        WHEN total_orders > 0 
+        THEN ROUND((completed_orders::NUMERIC / total_orders) * 100, 2)
+        ELSE 0
+    END AS order_completion_rate,
+    -- Order Frequency: Average days between orders
+    CASE 
+        WHEN (last_order_date - first_order_date) > 0 AND total_orders > 1
+        THEN ROUND((last_order_date - first_order_date)::NUMERIC / (total_orders - 1), 0)
+        ELSE NULL
+    END AS avg_days_between_orders,
     CURRENT_TIMESTAMP AS updated_at
 FROM customer_metrics
 ORDER BY total_revenue DESC
