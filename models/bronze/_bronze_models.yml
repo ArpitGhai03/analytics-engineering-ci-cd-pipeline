@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: brnz_customers
+    description: Bronze layer - Raw customer data with minimal transformations
+    columns:
+      - name: customer_id
+        description: Unique customer identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Customer full name
+      - name: email
+        description: Customer email address
+      - name: phone
+        description: Customer phone number
+      - name: country
+        description: Customer country
+      - name: loaded_at
+        description: Timestamp when data was loaded into bronze layer
+
+  - name: brnz_orders
+    description: Bronze layer - Raw order data with minimal transformations
+    columns:
+      - name: order_id
+        description: Unique order identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to customers table
+        tests:
+          - not_null
+      - name: order_date
+        description: Date when order was placed
+      - name: amount
+        description: Order amount in USD
+      - name: status
+        description: Order status
+      - name: loaded_at
+        description: Timestamp when data was loaded into bronze layer
