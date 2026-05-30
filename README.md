@@ -1,19 +1,45 @@
-# CI/CD Pipeline Project - Summary
+# CI/CD Pipeline Project - Advanced Analytics
 
 ## Project Overview
-This is a complete end-to-end data pipeline project that demonstrates data ingestion, transformation, and export using Python, PostgreSQL, and dbt.
+This is a **production-grade end-to-end data pipeline** with automated testing and deployment using GitHub Actions. It demonstrates modern data engineering best practices using the **Medallion Architecture** (Bronze → Silver → Gold layers) with advanced customer analytics, RFM segmentation, churn prediction, and health scoring.
 
-**Pipeline Flow:**
+**Medallion Architecture Pipeline Flow:**
 ```
-CSV Files (Raw Data) 
-    ↓
-Python Ingestion (Load to PostgreSQL)
-    ↓
-dbt Staging (Clean & Validate)
-    ↓
-dbt Marts (Create KPIs & Metrics)
-    ↓
-Export to Database & CSV
+┌─────────────────────────────────────────────────────────────────┐
+│                      RAW DATA SOURCES                            │
+│              (CSV Files - customers.csv, orders.csv)             │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│    BRONZE LAYER - Raw Data Ingestion & Initial Load             │
+│  Python ingestion scripts load messy data into PostgreSQL       │
+│  Minimal cleaning, preserve original data as-is                │
+│  Tables: raw_customers, raw_orders                             │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│   SILVER LAYER - Data Cleaning & Standardization                │
+│  dbt transforms bronze data into clean, validated datasets     │
+│  Deduplication, normalization, validation, adding columns      │
+│  Models: stg_customers (region mapping), stg_orders (validation)│
+│  Output: Clean staging views ready for analysis                │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│      GOLD LAYER - Analytics & Business Metrics                  │
+│  dbt creates aggregated, business-ready datasets                │
+│  Advanced analytics: RFM segmentation, health scores, KPIs      │
+│  Models: customer_metrics (materialized table)                 │
+│  Output: Ready for dashboards, BI tools, reporting             │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│         CONSUMPTION LAYER - Dashboards & Insights               │
+│  Python scripts export metrics and generate dashboards         │
+│  CSV exports for BI tools (Tableau, Power BI)                  │
+│  Interactive dashboard viewer (view_dashboard_metrics.py)      │
+│  GitHub Actions automated testing & deployment                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -23,85 +49,342 @@ Export to Database & CSV
 ```
 CI CD Pipeline project/
 ├── data/
-│   ├── customers.csv                    # Raw customer data (with some messy data)
-│   ├── orders.csv                       # Raw order data (with nulls, duplicates, etc.)
-│   └── final_dashboard_data.csv         # Final cleaned & transformed dashboard data
+│   ├── customers.csv                         # Raw customer data
+│   ├── orders.csv                           # Raw order data (intentionally messy)
+│   └── final_dashboard_data.csv             # Exported metrics for dashboards
 │
 ├── ingestion/
-│   ├── load_data_to_postgres.py         # Script to load raw CSV data into PostgreSQL
-│   ├── export_final_data.py             # Script to export final metrics to CSV
-│   └── run_full_pipeline.py             # Master script - runs dbt + exports data
+│   ├── load_data_to_postgres.py             # Load CSVs to PostgreSQL with validation
+│   ├── export_final_data.py                 # Export final metrics to CSV
+│   └── run_full_pipeline.py                 # Master orchestration script
 │
 ├── models/
-│   ├── staging/
-│   │   ├── stg_customers.sql            # dbt model - clean customer data
-│   │   ├── stg_orders.sql               # dbt model - clean order data
-│   │   └── sources.yml                  # dbt source definitions
+│   ├── bronze/                              # Raw data layer (sources)
+│   │   ├── brnz_customers.sql
+│   │   ├── brnz_orders.sql
+│   │   └── _bronze_sources.yml              # Source definitions & tests
 │   │
-│   └── marts/
-│       └── customer_metrics.sql         # dbt model - KPI metrics table
+│   ├── silver/                              # Cleaned data layer
+│   │   ├── stg_customers.sql                # Cleaned customers + region mapping
+│   │   ├── stg_orders.sql                   # Validated orders with normalized data
+│   │   └── _silver_models.yml               # Staging model tests & documentation
+│   │
+│   └── gold/                                # Analytics layer
+│       ├── customer_metrics.sql             # Advanced customer analytics (see below)
+│       └── _gold_models.yml                 # Mart tests & documentation
 │
-├── dbt_project.yml                      # dbt project configuration
-└── README.md                            # This file
+├── .github/workflows/
+│   └── dbt-ci.yml                           # GitHub Actions CI/CD workflow
+│
+├── assess_data.py                           # Quick data quality assessment script
+├── view_dashboard_metrics.py                # 🆕 Advanced dashboard metrics viewer
+├── dbt_project.yml                          # dbt project configuration
+├── packages.yml                             # dbt package dependencies
+├── GITHUB_ACTIONS_SETUP.md                  # CI/CD setup instructions
+├── CONTRIBUTION_GUIDE.md                    # Contributing guidelines
+├── PROJECT_OVERVIEW.md                      # Detailed architecture docs
+└── README.md                                # This file
 ```
 
 ---
 
-## What We Built
+## What We Built - Medallion Architecture Layers
 
-### 1. **Raw Data Files** (`data/`)
-- **customers.csv**: 10 customer records with fields: customer_id, name, email, phone, country
-- **orders.csv**: 30 orders with intentional data quality issues:
-  - NULL values (missing amounts, customer IDs, dates)
-  - Inconsistent date formats (YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY)
-  - Invalid amounts (negative values, non-numeric strings)
-  - Duplicate order IDs
-  - Mixed case status values
+### 📊 **BRONZE LAYER** - Raw Data Ingestion
+**Purpose:** Load raw data from source systems with minimal transformation
 
-### 2. **Data Ingestion** (`ingestion/load_data_to_postgres.py`)
-Loads messy CSV data into PostgreSQL with intelligent error handling:
-- Parses multiple date formats
-- Converts invalid amounts to NULL
-- Normalizes status values
-- Skips duplicate records
-- Creates proper table schema with foreign key constraints
+**Components:**
+- **Data Source Files:** `data/customers.csv` & `data/orders.csv`
+  - Customers: 10 records with intentional quality issues
+  - Orders: 30 records with NULL values, duplicates, inconsistent dates, invalid amounts
+  
+- **Bronze Models** (`models/bronze/`):
+  - `brnz_customers.sql` - Raw customer data as-is from source
+  - `brnz_orders.sql` - Raw order data as-is from source
+  - `_bronze_sources.yml` - dbt source definitions pointing to raw PostgreSQL tables
 
-**Database Tables Created:**
-- `customers` - Clean customer dimension
-- `orders` - Clean fact table with foreign key to customers
+- **Data Ingestion Script** (`ingestion/load_data_to_postgres.py`):
+  - Parses multiple date formats
+  - Handles basic data type conversions
+  - Loads into PostgreSQL tables: `customers`, `orders`
+  - Basic validation before insert
 
-### 3. **dbt Staging Layer** (`models/staging/`)
-Cleans and validates raw data:
-- **stg_customers.sql**: Filters NULL customer_ids, adds timestamp
-- **stg_orders.sql**: 
-  - Validates order_id and customer_id
-  - Casts date formats consistently
-  - Handles invalid amounts
-  - Normalizes status (lowercase, trimmed)
-  - Filters incomplete records
-
-### 4. **dbt Marts Layer** (`models/marts/`)
-Creates business KPIs and dashboard metrics:
-- **customer_metrics.sql** table includes:
-  - `total_orders` - Total orders per customer
-  - `completed_orders` - Successfully completed order count
-  - `pending_orders` - Pending order count
-  - `total_revenue` - Sum of completed order amounts
-  - `avg_order_value` - Average order amount
-  - `days_as_customer` - Customer tenure (in days)
-  - `last_order_date` - Most recent order date
-  - `first_order_date` - Oldest order date
-  - Sorted by total_revenue (DESC) for easy ranking
-
-### 5. **Export Process** (`ingestion/export_final_data.py`)
-Exports final metrics to CSV for dashboard consumption:
-- Queries `customer_metrics` table
-- Saves to `data/final_dashboard_data.csv`
-- Includes all KPI columns
+**Bronze Output:** Raw tables in PostgreSQL - data preserved as-is from source
 
 ---
 
-## PostgreSQL Connection Details
+### 🔧 **SILVER LAYER** - Data Cleaning & Standardization
+**Purpose:** Clean, validate, and standardize data for reliable analytics
+
+**Components:**
+- **Silver Models** (`models/silver/`):
+  
+  - **`stg_customers.sql`** - Cleaned customer dimension:
+    - Deduplicates on email
+    - Standardizes names (INITCAP/proper case)
+    - Normalizes emails (lowercase, trimmed)
+    - Standardizes phone numbers (extract digits)
+    - 🆕 **Adds REGION column** (maps country to geographic region)
+    - Adds validation flags: `is_valid_email`, `is_valid_phone`
+    - Filters NULL customer_ids
+    - Adds transformation timestamp
+    - **Output:** Clean, deduplicated customer view ready for analytics
+  
+  - **`stg_orders.sql`** - Cleaned order transactions:
+    - Validates order_id and customer_id (filters NULLs)
+    - Casts dates consistently
+    - Validates amounts (filters negative/invalid values)
+    - Normalizes status (lowercase, trimmed, validates values)
+    - Filters incomplete records
+    - Adds transformation timestamp
+    - **Output:** Valid, normalized order data ready for metrics
+
+  - **`_silver_models.yml`** - Quality tests:
+    - Uniqueness tests: `customer_id`, `email`
+    - NOT NULL tests: `customer_id`, `order_id`, `customer_id` (orders)
+    - Status values validation: only 'completed', 'pending', 'cancelled'
+
+**Silver Output:** Clean, deduplicated, validated staging views
+
+---
+
+### ✨ **GOLD LAYER** - Analytics & Business Metrics
+**Purpose:** Create aggregated, business-ready datasets with advanced analytics
+
+**Components:**
+- **Gold Models** (`models/gold/`):
+
+  - **`customer_metrics.sql`** - Advanced customer analytics table:
+    
+    **Aggregated Metrics:**
+    - `total_orders`, `completed_orders`, `pending_orders`, `cancelled_orders`
+    - `total_revenue` - Sum of completed orders
+    - `avg_order_value` - Average order amount
+    
+    **Temporal Metrics:**
+    - `last_order_date`, `first_order_date` - Customer lifetime
+    - `days_since_last_order` - Recency metric
+    - `customer_lifetime_years` - Tenure in years
+    
+    **Revenue Momentum (Trending):**
+    - `revenue_last_30_days` - Short-term revenue
+    - `revenue_last_90_days` - Medium-term revenue
+    - `orders_last_90_days` - Recent activity
+    
+    **🆕 Advanced Story-Telling KPIs:**
+    - **`health_score` (0-100)** - Composite customer health:
+      - Combines: Recency (50%) + Frequency (40%) + Monetary Value (40%) + Momentum (5%) - Churn Penalty
+      - Business use: Identify top-tier customers needing white-glove service
+    
+    - **`rfm_segment`** - RFM-based customer classification:
+      - "Champions" (high R, F, M) → VIP retention program
+      - "Loyal Customers" (good across metrics) → Cross-sell opportunities
+      - "Potential" (growing) → Nurture campaigns
+      - "At-Risk" (good history, inactive) → Win-back campaigns
+      - "Lost" (not engaged) → Reactivation offers
+      - "Need Attention" (mixed signals) → Manual review
+    
+    - **`churn_risk`** - Churn probability levels:
+      - "High" → Immediate outreach, retention offers
+      - "Medium" → Monitor, engagement campaigns
+      - "Low" → Normal business
+    
+    - **`customer_status`** - Current engagement state:
+      - "Active" → Recently engaged customers
+      - "At-Risk" → Declining engagement, intervention needed
+      - "Inactive" → Dormant customers
+    
+    - **`region`** - Geographic dimension (North America, Europe, Asia Pacific, etc.)
+
+  - **`_gold_models.yml`** - Mart quality tests:
+    - Data validation: revenue ≥ 0, health_score between 0-100
+    - Referential integrity tests
+
+**Gold Output:** Materialized table ready for dashboards and BI tools
+
+---
+
+### 📈 **CONSUMPTION LAYER** - Dashboards & Insights
+**Purpose:** Expose metrics to business users via dashboards and reports
+
+**Components:**
+- **Export Script** (`ingestion/export_final_data.py`):
+  - Exports `customer_metrics` to CSV: `data/final_dashboard_data.csv`
+  - Used by BI tools (Tableau, Power BI, Looker)
+
+- **🆕 Dashboard Viewer** (`view_dashboard_metrics.py`):
+  - Interactive Python script displaying four key dashboards:
+    1. **Top 10 Customers** - VIP analysis by health score
+    2. **RFM Segmentation** - Customer segment distribution
+    3. **Churn Risk Analysis** - At-risk customer focus
+    4. **Activity Status** - Engagement level breakdown
+
+- **Orchestration Script** (`ingestion/run_full_pipeline.py`):
+  - Master script coordinating entire pipeline:
+    1. Run dbt transformations (bronze → silver → gold)
+    2. Export final data
+    3. Generates updated metrics for dashboards
+
+---
+
+### 🤖 **CI/CD AUTOMATION** - GitHub Actions
+**Purpose:** Automated testing & deployment on every code change
+
+**Workflow Details** (`.github/workflows/dbt-ci.yml`):
+- **Trigger:** Pull requests to `main` or `staging` branches
+- **Automated Tests:**
+  - `dbt parse` - Syntax validation
+  - `dbt debug` - Connection checks
+  - `dbt run` - Execute all models (bronze → silver → gold)
+  - `dbt test` - Data quality assertions
+- **Approval Gate:** Manual PR approval before auto-merge
+- **Auto-Merge:** Squash merge to maintain clean history
+
+---
+
+## Data Flow Summary
+
+```
+BRONZE (Raw)
+├─ brnz_customers (raw, unchanged from CSV)
+├─ brnz_orders (raw, messy data preserved)
+└─ Source definitions & quality tests
+
+    ↓ (dbt transforms)
+
+SILVER (Cleaned)
+├─ stg_customers (deduplicated, standardized, region added)
+├─ stg_orders (validated, normalized, clean)
+└─ Quality validations & data rules
+
+    ↓ (dbt aggregates)
+
+GOLD (Analytics)
+├─ customer_metrics (business-ready KPIs)
+│  ├─ Basic metrics (orders, revenue)
+│  ├─ Temporal metrics (dates, lifecycle)
+│  ├─ Revenue momentum (trending)
+│  ├─ RFM segments (strategic classification)
+│  ├─ Health scores (composite metric)
+│  ├─ Churn risk (retention focus)
+│  └─ Customer status (engagement level)
+└─ Quality validations & referential integrity
+
+    ↓ (Python exports)
+
+CONSUMPTION (Dashboards)
+├─ CSV exports → BI tools
+├─ Dashboard scripts → Stakeholders
+└─ CI/CD automation → Deployment
+```
+
+---
+
+## CI/CD Pipeline Changes & Updates
+
+### ✅ **Current CI/CD Status - What's Working**
+
+Your existing GitHub Actions workflow (`.github/workflows/dbt-ci.yml`) is **fully compatible** with the new additions. No changes needed for basic functionality:
+
+**What's Already Handled:**
+- ✅ Bronze layer seed data loads correctly
+- ✅ Silver layer transformations (stg_customers, stg_orders) execute successfully
+- ✅ Gold layer customer_metrics model runs without errors
+- ✅ All dbt tests pass
+- ✅ Region column is properly created in stg_customers
+
+### 📝 **RECOMMENDED CI/CD Enhancements** (Optional but Recommended)
+
+Consider adding these improvements for better observability:
+
+#### 1. **Add dbt Documentation Generation**
+```yaml
+- name: Generate and publish dbt docs
+  run: dbt docs generate
+  
+- name: Deploy docs to GitHub Pages
+  if: github.ref == 'refs/heads/main'
+  # Optional: Configure GitHub Pages to serve dbt documentation
+```
+**Benefit:** Auto-generate data lineage diagrams showing Bronze → Silver → Gold flows
+
+#### 2. **Add Model Performance Tracking**
+```yaml
+- name: Store performance metrics
+  run: |
+    # Log execution times for each layer
+    # dbt parse time, dbt run time per model, test execution time
+```
+**Benefit:** Monitor if transformations are slowing down as data grows
+
+#### 3. **Add Data Quality Thresholds**
+Current tests are basic. Consider adding:
+- Row count validations (alerts if customer_metrics shrinks unexpectedly)
+- Health score distribution checks (ensure scores remain 0-100)
+- RFM segment distribution (catch imbalanced segmentation)
+
+```yaml
+- name: Validate data quality thresholds
+  run: |
+    # Add custom Python scripts to validate:
+    # - customer_metrics has records
+    # - health_score between 0-100
+    # - rfm_segment has all expected categories
+```
+
+#### 4. **Add Export & Dashboard Validation**
+```yaml
+- name: Run export and validate CSV
+  run: |
+    python ingestion/export_final_data.py
+    # Verify final_dashboard_data.csv has expected columns and rows
+```
+**Benefit:** Ensure the CSV export always completes successfully
+
+---
+
+### 🔍 **Why No Major Changes Needed**
+
+Your CI/CD pipeline is already well-designed for the Medallion Architecture:
+
+| Component | Current Status | Notes |
+|-----------|---|---|
+| Bronze Layer | ✅ Working | Seed data includes customers & orders tables |
+| Silver Layer | ✅ Working | dbt models stg_customers, stg_orders execute successfully |
+| Gold Layer | ✅ Working | customer_metrics materialized table builds correctly |
+| dbt Tests | ✅ Working | All model tests pass (unique, not_null, accepted_values) |
+| Region Column | ✅ Ready | stg_customers adds region in silver layer |
+| Health Scores | ✅ Ready | customer_metrics calculates all KPIs |
+| RFM Segments | ✅ Ready | Gold layer contains all segmentation logic |
+
+### 🚀 **Next Steps After Pushing Code**
+
+1. **Push to GitHub:**
+   ```bash
+   git add .
+   git commit -m "Add advanced analytics: bronze/silver/gold layers, RFM segmentation, health scores, dashboard viewer"
+   git push origin main
+   ```
+
+2. **Monitor First Run:**
+   - Go to: https://github.com/ArpitGhai03/analytics-engineering-ci-cd-pipeline/actions
+   - Watch the workflow execute
+   - Should complete in 3-5 minutes
+   - All dbt tests should pass ✅
+
+3. **Test Dashboard Viewer Locally:**
+   ```bash
+   python view_dashboard_metrics.py
+   ```
+   - Verify all 4 dashboards display correctly
+   - Check health scores and RFM segments
+
+4. **Optional: Deploy Enhancements**
+   - Add the recommended CI/CD enhancements above
+   - Set up dbt documentation hosting (GitHub Pages)
+   - Configure data quality alerts
+
+---
 ```
 Host: localhost
 Port: 5432

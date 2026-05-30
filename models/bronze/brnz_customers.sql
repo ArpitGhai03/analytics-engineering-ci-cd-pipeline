@@ -1,7 +1,7 @@
 {{
   config(
-    materialized='view',
-    tags=['staging']
+    materialized='table',
+    tags=['bronze', 'raw']
   )
 }}
 
@@ -11,6 +11,6 @@ SELECT
     email,
     phone,
     country,
-    CURRENT_TIMESTAMP AS created_at
-FROM public.customers
+    CURRENT_TIMESTAMP AS loaded_at
+FROM {{ source('raw', 'customers') }}
 WHERE customer_id IS NOT NULL

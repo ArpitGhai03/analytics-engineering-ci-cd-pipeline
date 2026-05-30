@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: customer_metrics
+    description: Gold layer - Customer analytics table with story-telling KPIs for dashboards
+    columns:
+      - name: customer_id
+        description: Unique customer identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Customer name
+      - name: email
+        description: Customer email
+      - name: country
+        description: Customer country
+      - name: region
+        description: Geographic region
+      # --- BASIC METRICS ---
+      - name: total_orders
+        description: Total number of orders (all statuses)
+      - name: completed_orders
+        description: Number of successfully completed orders
+      - name: pending_orders
+        description: Number of pending orders
+      - name: cancelled_orders
+        description: Number of cancelled orders
+      - name: total_revenue
+        description: Total revenue from completed orders
+      - name: avg_order_value
+        description: Average value of completed orders
+      # --- TEMPORAL METRICS ---
+      - name: last_order_date
+        description: Most recent order date
+      - name: first_order_date
+        description: First order date
+      - name: days_since_last_order
+        description: Days since last activity (recency metric)
+      - name: customer_lifetime_years
+        description: Years as customer (tenure)
+      # --- REVENUE MOMENTUM (tells growth story) ---
+      - name: revenue_last_30_days
+        description: Revenue from last 30 days (current trend)
+      - name: revenue_last_90_days
+        description: Revenue from last 90 days (broader trend)
+      - name: orders_last_90_days
+        description: Number of orders in last 90 days
+      # --- PRIMARY STORY-TELLING KPIs ---
+      - name: health_score
+        description: Overall customer health (0-100). Composite of recency, frequency, monetization, and growth trend
+        tests:
+          - not_null
+      - name: rfm_segment
+        description: Customer segment based on RFM analysis (Champions, Loyal, Potential, At-Risk, Lost, Need Attention)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Champions', 'Loyal Customers', 'Potential', 'At-Risk', 'Lost', 'Need Attention']
+      - name: churn_risk
+        description: Churn risk level (Low, Medium, High) based on inactivity and revenue trend
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Low', 'Medium', 'High']
+      - name: customer_status
+        description: Current customer status (Active, At-Risk, Inactive) based on recency
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Active', 'At-Risk', 'Inactive']
+      # --- SUPPORTING METRICS ---
+      - name: avg_order_value_overall
+        description: Overall average order value (context for comparing individual customers)
+      - name: avg_customer_revenue_overall
+        description: Overall average customer revenue (context for comparing individual customers)
+      - name: updated_at
+        description: Timestamp of last update

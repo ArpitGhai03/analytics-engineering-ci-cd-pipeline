@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: Silver layer - Cleaned and validated customer data with standardization and quality flags
+    columns:
+      - name: customer_id
+        description: Unique customer identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Customer name (standardized to proper case)
+        tests:
+          - not_null
+      - name: email
+        description: Customer email (normalized - lowercase and trimmed)
+        tests:
+          - unique
+      - name: phone_digits
+        description: Customer phone (digits only)
+      - name: region
+        description: Geographic region mapped from country
+      - name: country
+        description: Customer country
+      - name: is_valid_email
+        description: Flag indicating valid email format
+      - name: is_valid_phone
+        description: Flag indicating valid phone format (10+ digits)
+      - name: loaded_at
+        description: Bronze load timestamp
+      - name: transformed_at
+        description: Silver transformation timestamp
+
+  - name: stg_orders
+    description: Silver layer - Cleaned and validated order data with quality flags and outlier detection
+    columns:
+      - name: order_id
+        description: Unique order identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to customer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_date
+        description: Date when order was placed
+        tests:
+          - not_null
+      - name: amount
+        description: Order amount in USD
+      - name: status
+        description: Order status
+        tests:
+          - accepted_values:
+              values: ['completed', 'pending', 'cancelled']
+      - name: is_valid_date
+        description: Flag indicating valid order date
+      - name: is_valid_amount
+        description: Flag indicating valid order amount (>0 and <10000)
+      - name: is_valid_status
+        description: Flag indicating valid order status
+      - name: is_high_value_order
+        description: Flag indicating high-value order (top 5%)
+      - name: is_low_value_order
+        description: Flag indicating low-value order (bottom 5%)
+      - name: loaded_at
+        description: Bronze load timestamp
+      - name: transformed_at
+        description: Silver transformation timestamp

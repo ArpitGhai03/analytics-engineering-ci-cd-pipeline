@@ -22,12 +22,6 @@ clean-targets:
 # Configuring models
 models:
   dbt_project:
-    staging:
-      materialized: view
-      tags: ['staging']
-    marts:
-      materialized: table
-      tags: ['marts']
 
 # Seed configuration
 seeds:
